@@ -6,6 +6,12 @@
  */
 
 import { Command, Option } from 'commander';
+import {
+  addAlexandriaScrapeOptions,
+  buildCalls,
+  createFindToolsCommand,
+  handleAlexandria,
+} from './commands/alexandria';
 import { readFileSync } from 'fs';
 import {
   handleScrapeCommand,
@@ -311,12 +317,32 @@ program
     'Firecrawl API key (or set FIRECRAWL_API_KEY env var)'
   )
   .option('--api-url <url>', 'API URL (or set FIRECRAWL_API_URL env var)')
+  .addOption(
+    new Option('--enable <feature>').choices(['alexandria']).hideHelp()
+  )
   .option('--status', 'Show version, auth status, concurrency, and credits')
   .allowUnknownOption() // Allow unknown options when URL is passed directly
   .hook('preAction', async (thisCommand, actionCommand) => {
     // Update global config if API key or URL is provided via global option
     const globalOptions = thisCommand.opts();
     const commandOptions = actionCommand.opts();
+    const usesAlexandria =
+      actionCommand.name() === 'find-tools' ||
+      (actionCommand.name() === 'setup' &&
+        actionCommand.args[0] === 'alexandria') ||
+      commandOptions.domainTools ||
+      (actionCommand.name() === 'scrape' &&
+        (commandOptions.alexandria ||
+          commandOptions.options ||
+          commandOptions.requestId)) ||
+      (actionCommand.name() === 'search' &&
+        commandOptions.sources
+          ?.split(',')
+          .some(
+            (source: string) => source.trim().toLowerCase() === 'alexandria'
+          ));
+    if (usesAlexandria && globalOptions.enable !== 'alexandria')
+      throw new Error('This beta feature requires --enable alexandria.');
     if (globalOptions.apiKey) {
       updateConfig({ apiKey: globalOptions.apiKey });
     }
@@ -436,6 +462,20 @@ function createScrapeCommand(): Command {
       // Remove duplicates
       urls = [...new Set(urls)];
 
+      if (options.alexandria) {
+        if (urls.length || options.domainTools)
+          throw new Error(
+            'Provider execution cannot be combined with URL scraping.'
+          );
+        await handleAlexandria(
+          buildCalls(options.alexandria, options.options),
+          options
+        );
+        return;
+      }
+      if (options.options || options.requestId)
+        throw new Error('--options and --request-id require --alexandria.');
+
       if (urls.length === 0) {
         console.error(
           'Error: URL is required. Provide it as argument or use --url option.'
@@ -507,6 +547,7 @@ function createScrapeCommand(): Command {
       }
     });
 
+  addAlexandriaScrapeOptions(scrapeCmd);
   return scrapeCmd;
 }
 
@@ -983,7 +1024,12 @@ function createSearchCommand(): Command {
           .map((s: string) => s.trim().toLowerCase()) as SearchSource[];
 
         // Validate sources
-        const validSources = ['web', 'images', 'news'];
+        const validSources = [
+          'web',
+          'images',
+          'news',
+          ...(program.opts().enable === 'alexandria' ? ['alexandria'] : []),
+        ];
         for (const source of sources) {
           if (!validSources.includes(source)) {
             console.error(
@@ -1023,6 +1069,7 @@ function createSearchCommand(): Command {
 
       const searchOptions = {
         query,
+        domainTools: options.domainTools,
         limit: options.limit,
         sources,
         categories,
@@ -1045,6 +1092,7 @@ function createSearchCommand(): Command {
       await handleSearchCommand(searchOptions);
     });
 
+  searchCmd.addOption(new Option('--domain-tools').hideHelp());
   return searchCmd;
 }
 
@@ -2092,6 +2140,7 @@ program.addCommand(createMapCommand());
 program.addCommand(createParseCommand());
 program.addCommand(createMonitorCommand());
 program.addCommand(createSearchCommand());
+program.addCommand(createFindToolsCommand(), { hidden: true });
 program.addCommand(createDeveloperCommand());
 program.addCommand(createResearchCommand());
 program.addCommand(createFeedbackCommand());
