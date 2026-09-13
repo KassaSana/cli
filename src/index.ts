@@ -328,6 +328,8 @@ program
     const commandOptions = actionCommand.opts();
     const usesAlexandria =
       actionCommand.name() === 'find-tools' ||
+      (actionCommand.name() === 'setup' &&
+        actionCommand.args[0] === 'alexandria') ||
       commandOptions.domainTools ||
       (actionCommand.name() === 'scrape' &&
         (commandOptions.alexandria ||

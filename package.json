@@ -71,6 +71,7 @@
   },
   "files": [
     "dist",
+    "beta-skills",
     "README.md"
   ],
   "packageManager": "pnpm@10.12.1",

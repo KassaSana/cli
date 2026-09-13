@@ -82,6 +82,9 @@ it('keeps beta options out of normal help and refuses use without opt-in', async
   const result = await cli(['search', 'gdp', '--sources', 'alexandria']);
   expect(result.code).toBe(1);
   expect(result.stderr).toContain('--enable alexandria');
+  const setup = await cli(['setup', 'alexandria', '--yes']);
+  expect(setup.code).toBe(1);
+  expect(setup.stderr).toContain('--enable alexandria');
   expect(requests).toHaveLength(0);
 });
 
