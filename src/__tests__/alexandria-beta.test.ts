@@ -71,7 +71,7 @@ async function cli(args: string[], key = 'fc-test') {
   }
 }
 
-it('keeps beta options out of normal help and refuses use without opt-in', async () => {
+it('keeps beta options out of normal help and respects explicit web-only search', async () => {
   for (const args of [['--help'], ['search', '--help'], ['scrape', '--help']]) {
     const result = await cli(args);
     expect(result.code).toBe(0);
@@ -79,13 +79,19 @@ it('keeps beta options out of normal help and refuses use without opt-in', async
       /alexandria|find-tools|domain-tools|--enable/i
     );
   }
-  const result = await cli(['search', 'gdp', '--sources', 'alexandria']);
-  expect(result.code).toBe(1);
-  expect(result.stderr).toContain('--enable alexandria');
-  const setup = await cli(['setup', 'alexandria', '--yes']);
-  expect(setup.code).toBe(1);
-  expect(setup.stderr).toContain('--enable alexandria');
-  expect(requests).toHaveLength(0);
+  response = { success: true, data: { web: [] } };
+  const result = await cli([
+    'search',
+    'pizza hut',
+    '--sources',
+    'web',
+    '--json',
+  ]);
+  expect(result.code).toBe(0);
+  expect(requests[0].body).toMatchObject({
+    sources: [{ type: 'web' }],
+    domainTools: false,
+  });
 });
 
 it('preserves mixed search results, tools and billing metadata', async () => {
@@ -98,16 +104,7 @@ it('preserves mixed search results, tools and billing metadata', async () => {
       tools: [{ provider: 'fred', capability: 'series/observations' }],
     },
   };
-  const result = await cli([
-    '--enable',
-    'alexandria',
-    'search',
-    'gdp',
-    '--sources',
-    'web,alexandria',
-    '--domain-tools',
-    '--json',
-  ]);
+  const result = await cli(['search', 'pizza hut', '--json']);
   expect(result.code).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual(response);
   expect(requests[0]).toMatchObject({
@@ -118,12 +115,13 @@ it('preserves mixed search results, tools and billing metadata', async () => {
       domainTools: true,
     },
   });
+  const readable = await cli(['search', 'pizza hut']);
+  expect(readable.stdout).toContain('=== Tools ===');
+  expect(readable.stdout).toContain('series/observations');
 });
 
 it('sends provider calls to Scrape with a stable retry ID and preserves the receipt', async () => {
   const args = [
-    '--enable',
-    'alexandria',
     'scrape',
     '--alexandria',
     'fred/series/observations',
@@ -167,8 +165,6 @@ it('relays terms refusals and keeps the request ID on failure', async () => {
     requiresAction: { url: 'https://firecrawl.dev/terms/provider' },
   };
   const result = await cli([
-    '--enable',
-    'alexandria',
     'scrape',
     '--alexandria',
     'provider/lookup',
@@ -182,13 +178,7 @@ it('relays terms refusals and keeps the request ID on failure', async () => {
 });
 
 it('executes Find Tools through the same API and refuses keyless access', async () => {
-  const args = [
-    '--enable',
-    'alexandria',
-    'find-tools',
-    '--options',
-    '{"providers":["fred"]}',
-  ];
+  const args = ['find-tools', '--options', '{"providers":["fred"]}'];
   expect((await cli(args, '')).code).toBe(1);
   expect(requests).toHaveLength(0);
   expect((await cli(args)).code).toBe(0);
@@ -211,13 +201,7 @@ it('keeps URL scrape tool contracts in the output', async () => {
     success: true,
     data: { markdown: 'Example', tools: [{ provider: 'fred' }] },
   };
-  const result = await cli([
-    'scrape',
-    'https://example.com',
-    '--enable',
-    'alexandria',
-    '--domain-tools',
-  ]);
+  const result = await cli(['scrape', 'https://example.com', '--domain-tools']);
   expect(result.code).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual(response.data);
   expect(requests[0]).toMatchObject({
