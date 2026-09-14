@@ -326,23 +326,6 @@ program
     // Update global config if API key or URL is provided via global option
     const globalOptions = thisCommand.opts();
     const commandOptions = actionCommand.opts();
-    const usesAlexandria =
-      actionCommand.name() === 'find-tools' ||
-      (actionCommand.name() === 'setup' &&
-        actionCommand.args[0] === 'alexandria') ||
-      commandOptions.domainTools ||
-      (actionCommand.name() === 'scrape' &&
-        (commandOptions.alexandria ||
-          commandOptions.options ||
-          commandOptions.requestId)) ||
-      (actionCommand.name() === 'search' &&
-        commandOptions.sources
-          ?.split(',')
-          .some(
-            (source: string) => source.trim().toLowerCase() === 'alexandria'
-          ));
-    if (usesAlexandria && globalOptions.enable !== 'alexandria')
-      throw new Error('This beta feature requires --enable alexandria.');
     if (globalOptions.apiKey) {
       updateConfig({ apiKey: globalOptions.apiKey });
     }
@@ -1017,19 +1000,14 @@ function createSearchCommand(): Command {
     .option('--json', 'Output as compact JSON', false)
     .action(async (query, options) => {
       // Parse sources
-      let sources: SearchSource[] | undefined;
+      let sources: SearchSource[] = ['web', 'alexandria'];
       if (options.sources) {
         sources = options.sources
           .split(',')
           .map((s: string) => s.trim().toLowerCase()) as SearchSource[];
 
         // Validate sources
-        const validSources = [
-          'web',
-          'images',
-          'news',
-          ...(program.opts().enable === 'alexandria' ? ['alexandria'] : []),
-        ];
+        const validSources = ['web', 'images', 'news', 'alexandria'];
         for (const source of sources) {
           if (!validSources.includes(source)) {
             console.error(
@@ -1069,7 +1047,7 @@ function createSearchCommand(): Command {
 
       const searchOptions = {
         query,
-        domainTools: options.domainTools,
+        domainTools: options.domainTools ?? sources.includes('alexandria'),
         limit: options.limit,
         sources,
         categories,

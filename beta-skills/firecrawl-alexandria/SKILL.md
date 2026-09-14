@@ -5,19 +5,19 @@ description: Use for explicitly requested Firecrawl Alexandria beta tool discove
 
 # Alexandria Beta
 
-Use the beta CLI explicitly on every invocation: `npx firecrawl-cli@alexandria --enable alexandria`. Do not replace the user's stable CLI or use a direct Exchange connection. The beta must be published before this npm tag works.
+Use the beta CLI explicitly on every invocation: `npx firecrawl-cli@alexandria`. Version `1.23.4-alexandria-beta.1` or newer needs no enable flag. Do not replace the user's stable CLI or use a direct Exchange connection.
 
-Use `FIRECRAWL_API_KEY` or existing Firecrawl login credentials. Never print credentials. The hidden flag is not authorization: the API enforces team and provider access.
+Use `FIRECRAWL_API_KEY` or existing Firecrawl login credentials. Never print credentials. Installing the beta is not authorization: the API enforces team and provider access.
 
 ## Discover Before Executing
 
 ```sh
-npx firecrawl-cli@alexandria --enable alexandria search "GDP" --sources alexandria --json
-npx firecrawl-cli@alexandria --enable alexandria find-tools --options '{"providers":["fred"]}' --pretty
-npx firecrawl-cli@alexandria --enable alexandria find-tools https://example.com --pretty
+npx firecrawl-cli@alexandria search "GDP" --json
+npx firecrawl-cli@alexandria find-tools --options '{"providers":["fred"]}' --pretty
+npx firecrawl-cli@alexandria find-tools https://example.com --pretty
 ```
 
-For ordinary web results alongside provider tools, use `--sources web,alexandria`. For URL scraping with related tool discovery, use `scrape https://example.com --domain-tools --json` after the same beta prefix.
+Search defaults to web results plus Alexandria tools and domain-tool discovery. Inspect both; discovery does not execute the returned provider tools. Use `--sources web` for web-only search or `--sources alexandria` for tool-only discovery. Search itself can consume credits. For URL scraping with related tool discovery, use `scrape https://example.com --domain-tools --json` after the same beta prefix.
 
 Read the returned `data.tools` contracts before choosing a provider/capability. Use their exact input schema, pricing and access requirements; never invent options or assume a provider is free. Follow returned Find Tools requests with `find-tools --request '<returned request JSON>'`. This accepts only the `firecrawl/find-tools` discovery call, not arbitrary provider execution.
 
@@ -28,7 +28,7 @@ Obtain approval before paid execution unless the user has already authorized the
 Once the discovered contract confirms the capability and options:
 
 ```sh
-npx firecrawl-cli@alexandria --enable alexandria scrape --alexandria fred/series/observations --options '{"series_id":"GDP"}' --request-id gdp-beta-1 --json
+npx firecrawl-cli@alexandria scrape --alexandria fred/series/observations --options '{"series_id":"GDP"}' --request-id gdp-beta-1 --json
 ```
 
 Choose a new unique request ID for each new logical execution; the ID above is only an example. Preserve the ID printed on stderr and reuse it only for identical retries, including options and call order. For batches, repeat `--alexandria` and pair each call with a positional `--options` object (maximum 10 calls).
