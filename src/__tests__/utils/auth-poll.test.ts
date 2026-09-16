@@ -275,6 +275,19 @@ describe('waitForAuth', () => {
       expect.objectContaining({ method: 'POST' })
     );
   });
+
+  it('builds the same endpoint from the production default host', async () => {
+    fetchMock.mockImplementation(
+      jsonResponse({ status: 'complete', apiKey: 'fc-key' })
+    );
+
+    await waitForAuth(SESSION_ID, CODE_VERIFIER, WEB_URL);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://www.firecrawl.dev/api/auth/cli/status',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
 });
 
 describe('default web URL', () => {
