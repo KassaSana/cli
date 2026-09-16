@@ -11,7 +11,10 @@ import { pollAuthStatus, waitForAuth, WEB_URL } from '../../utils/auth';
 
 const SESSION_ID = 'a'.repeat(64);
 const CODE_VERIFIER = 'b'.repeat(43);
-const WEB_HOST = 'https://www.firecrawl.dev';
+// Deliberately not the production default, so a code path that ignores the
+// --web-url override fails these tests instead of passing by coincidence.
+const WEB_HOST = 'https://test-host.example';
+const STATUS_URL = `${WEB_HOST}/api/auth/cli/status`;
 
 /**
  * A Response body can only be read once, so every call must get a fresh one.
@@ -54,6 +57,10 @@ describe('pollAuthStatus', () => {
     const result = await pollAuthStatus(SESSION_ID, CODE_VERIFIER, WEB_HOST);
 
     expect(result).toEqual({ status: 'pending' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      STATUS_URL,
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 
   it('reports complete with the session when the browser has authorised', async () => {
@@ -139,12 +146,12 @@ describe('waitForAuth', () => {
 
   it('surfaces an error naming the host instead of polling a dead transport to timeout', async () => {
     fetchMock.mockRejectedValue(
-      transportFailure('ENOTFOUND', 'getaddrinfo ENOTFOUND www.firecrawl.dev')
+      transportFailure('ENOTFOUND', 'getaddrinfo ENOTFOUND test-host.example')
     );
 
     const pending = waitForAuth(SESSION_ID, CODE_VERIFIER, WEB_HOST);
     const assertion = expect(pending).rejects.toThrow(
-      /Cannot reach www\.firecrawl\.dev/
+      /Cannot reach test-host\.example/
     );
     await drain();
     await assertion;
@@ -235,7 +242,7 @@ describe('waitForAuth', () => {
     await waitForAuth(SESSION_ID, CODE_VERIFIER, WEB_HOST);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://www.firecrawl.dev/api/auth/cli/status',
+      STATUS_URL,
       expect.objectContaining({ method: 'POST' })
     );
   });

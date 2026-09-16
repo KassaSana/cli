@@ -284,6 +284,9 @@ async function waitForAuth(
           break;
 
         case 'unreachable':
+          // Both budgets count consecutive failures, so each outcome clears the
+          // other counter.
+          serverFailures = 0;
           transportFailures += 1;
           debugLog(`cannot reach ${host}: ${result.detail}`);
           if (transportFailures >= MAX_TRANSPORT_FAILURES) {
@@ -298,6 +301,7 @@ async function waitForAuth(
           break;
 
         case 'server-busy':
+          transportFailures = 0;
           serverFailures += 1;
           debugLog(`${host} returned a retryable error: ${result.detail}`);
           if (serverFailures >= MAX_SERVER_FAILURES) {
