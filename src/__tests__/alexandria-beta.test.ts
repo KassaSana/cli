@@ -91,16 +91,84 @@ function catalogue(level: string, items: any[], next?: unknown) {
   };
 }
 
+it('starts with a live category guide and preserves category-discovery access errors', async () => {
+  response = {
+    cohorts: [
+      {
+        cohort: 'finance',
+        about: 'Live market data description.',
+        providers: 2,
+      },
+      {
+        cohort: 'new-category',
+        about: 'A category added by the server.',
+        providers: 0,
+      },
+    ],
+  };
+  const guide = await cli(['alexandria', 'list']);
+  expect(guide.code).toBe(0);
+  expect(guide.stdout).toContain('Firecrawl Alexandria');
+  expect(guide.stdout).toContain(
+    'Finance (finance): Live market data description.'
+  );
+  expect(guide.stdout).toContain('New Category (new-category)');
+  expect(guide.stdout).not.toContain('Providers (');
+  expect(requests[0]).toMatchObject({
+    url: '/exchange/discover',
+    headers: { authorization: 'Bearer fc-test' },
+  });
+  expect(requests[0].body).toBeUndefined();
+  const json = await cli(['list-tools', '--json']);
+  expect(json.code).toBe(0);
+  expect(JSON.parse(json.stdout).data).toMatchObject({
+    level: 'categories',
+    total: 2,
+    items: [
+      {
+        id: 'finance',
+        nextCommand: 'firecrawl alexandria list finance --category',
+      },
+      { id: 'new-category' },
+    ],
+  });
+  status = 403;
+  response = {
+    success: false,
+    error: 'Access required',
+    code: 'ACCESS_REQUIRED',
+    requiresAction: { type: 'request_access' },
+  };
+  const denied = await cli(['list', '--json']);
+  expect(denied.code).toBe(1);
+  expect(JSON.parse(denied.stdout)).toMatchObject({
+    ...response,
+    discoveryRequests: [{ requestId: expect.any(String) }],
+  });
+  expect(
+    requests.every((request) => request.url === '/exchange/discover')
+  ).toBe(true);
+});
+
 it('browses live provider IDs directly or through a category without expanding contracts', async () => {
   responseFor = (body) => {
     const options = body.alexandria[0].options;
     if (options.providers?.[0] === 'finance')
       return catalogue(options.level, []);
+    if (
+      ['retail', 'Retail', 'Public records'].includes(options.categories?.[0])
+    )
+      return catalogue(options.level, []);
     return catalogue(options.level, [
       { id: 'benzinga', provider: 'benzinga', name: 'Benzinga' },
     ]);
   };
-  for (const args of [[], ['finance'], ['benzinga'], ['finance', 'benzinga']]) {
+  for (const args of [
+    ['--providers'],
+    ['finance'],
+    ['benzinga'],
+    ['finance', 'benzinga'],
+  ]) {
     expect((await cli(['list', ...args])).code).toBe(0);
   }
   expect((await cli(['alexandria', 'list', 'benzinga', '--groups'])).code).toBe(
@@ -108,6 +176,8 @@ it('browses live provider IDs directly or through a category without expanding c
   );
   expect((await cli(['list-tools', 'benzinga'])).code).toBe(0);
   expect((await cli(['alexandria', 'list-tools', 'benzinga'])).code).toBe(0);
+  expect((await cli(['list', 'Retail', '--category'])).code).toBe(0);
+  expect((await cli(['list', 'Public records', '--category'])).code).toBe(0);
   expect(requests.map((request) => request.body.alexandria[0].options)).toEqual(
     [
       { level: 'providers', limit: 20 },
@@ -125,6 +195,10 @@ it('browses live provider IDs directly or through a category without expanding c
       { providers: ['benzinga'], level: 'groups', limit: 20 },
       { providers: ['benzinga'], level: 'tools', limit: 20 },
       { providers: ['benzinga'], level: 'tools', limit: 20 },
+      { categories: ['Retail'], level: 'providers', limit: 20 },
+      { categories: ['shopping'], level: 'providers', limit: 20 },
+      { categories: ['Public records'], level: 'providers', limit: 20 },
+      { categories: ['government'], level: 'providers', limit: 20 },
     ]
   );
   expect(
@@ -135,6 +209,16 @@ it('browses live provider IDs directly or through a category without expanding c
         body.alexandria[0].capability === 'find-tools'
     )
   ).toBe(true);
+  responseFor = () =>
+    catalogue('providers', [
+      { id: 'future-retailer', provider: 'future-retailer' },
+    ]);
+  const canonical = await cli(['list', 'retail', '--category']);
+  expect(canonical.code).toBe(0);
+  expect(canonical.stdout).toContain('future-retailer');
+  expect(requests.at(-1)?.body.alexandria[0].options.categories).toEqual([
+    'retail',
+  ]);
 });
 
 it('expands only a selected tool and falls back to a compact group listing', async () => {
@@ -254,7 +338,7 @@ it('refuses execution through list and propagates discovery access errors', asyn
       creditsCost: 0,
     },
   };
-  const result = await cli(['list', '--json']);
+  const result = await cli(['list', '--providers', '--json']);
   expect(result.code).toBe(1);
   expect(JSON.parse(result.stdout).data.alexandria[0].error).toEqual(
     response.data.alexandria[0].error
