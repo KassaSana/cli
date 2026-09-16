@@ -219,6 +219,35 @@ describe('waitForAuth', () => {
     await expect(pending).resolves.toMatchObject({ apiKey: 'fc-after-429' });
   });
 
+  it('counts each failure budget only while that failure repeats', async () => {
+    // The transport budget is 3 and the server budget is 5. Five rounds of one
+    // dead transport then one rate limit exhaust both if a counter survives the
+    // other outcome, yet no failure of either kind ever repeats.
+    const rounds: Array<() => Promise<Response>> = [];
+    for (let round = 0; round < 5; round++) {
+      rounds.push(() =>
+        Promise.reject(transportFailure('ECONNRESET', 'socket hang up'))
+      );
+      rounds.push(
+        jsonResponse({ error: 'Too many requests.' }, { status: 429 })
+      );
+    }
+    const complete = jsonResponse({
+      status: 'complete',
+      apiKey: 'fc-after-mixed',
+    });
+    let call = 0;
+    fetchMock.mockImplementation(() => (rounds[call++] ?? complete)());
+
+    const pending = waitForAuth(SESSION_ID, CODE_VERIFIER, WEB_HOST);
+    await drain();
+
+    await expect(pending).resolves.toMatchObject({
+      apiKey: 'fc-after-mixed',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(rounds.length + 1);
+  });
+
   it('stops at once when the server refuses the session', async () => {
     fetchMock.mockImplementation(
       jsonResponse({ error: 'Session expired' }, { status: 410 })
