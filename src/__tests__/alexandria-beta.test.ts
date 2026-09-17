@@ -431,6 +431,12 @@ it('sends provider calls to Scrape with a stable retry ID and preserves the rece
     expect(JSON.parse(result.stdout)).toEqual({
       ...response,
       requestId: 'retry-1',
+      receipt: {
+        creditsUsed: 1,
+        requestId: 'retry-1',
+        operationId: 'scrape-1',
+        operationType: 'scrape',
+      },
     });
   }
   expect(requests).toHaveLength(2);

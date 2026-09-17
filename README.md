@@ -1039,3 +1039,9 @@ https://www.firecrawl.dev/app/settings?tab=data-sources. Never infer consent fro
 failed lookup or automatically retry an acceptance. The API remains authoritative
 for organization access and acceptance authority.
 After confirmed success, rerun the original provider command; its normal credits apply.
+
+### Alexandria receipts and retries
+
+Alexandria execution JSON includes an additive `receipt`: `creditsUsed` is actual reported usage (missing means unknown), `requestId` is the client idempotency identity, and `operationId`/`operationType` identify the server scrape. Existing response fields remain available. IDs, reported credits, and available retry delays print to stderr.
+
+Use the same request ID to recover pending or uncertain execution. Completed results, including failures, replay under the same ID; a deliberate new execution needs a new ID and may charge again. Never automatically rotate an uncertain ID. Structured failures preserve available status, code, action and retry metadata.
