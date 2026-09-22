@@ -32,6 +32,7 @@ const providerIssues = [
 ];
 const capabilityIssues = [
   'new_capability_request',
+  'missing_capability',
   'insufficient_functionality',
   'incorrect_result',
   'execution_error',
@@ -115,7 +116,7 @@ export function createAlexandriaFeedbackCommand(): Command {
     )
     .option(
       '--capability-feedback <json>',
-      'Array of {name, provider, issue, why, requestedFunctionality?}; issues: new_capability_request (requires requestedFunctionality), insufficient_functionality, incorrect_result, execution_error, other',
+      'Array of {name, provider, issue, why, requestedFunctionality?}; issues: new_capability_request (requires requestedFunctionality), missing_capability (provider exists but lacks this capability), insufficient_functionality, incorrect_result, execution_error, other',
       (value) => parseAlexandriaFeedbackArray(value, true)
     )
     .option('-k, --api-key <key>', 'Firecrawl API key')
