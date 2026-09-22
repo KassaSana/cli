@@ -1202,6 +1202,17 @@ it.each([
     '--capability-feedback',
     [{ name: 'attachments', issue: 'execution_error', why: 'Timeout' }],
   ],
+  [
+    '--capability-feedback',
+    [
+      {
+        name: 'attachments',
+        provider: 'example',
+        issue: 'unknown_issue',
+        why: 'Not a real code',
+      },
+    ],
+  ],
 ])('rejects malformed %s before posting', async (flag, entries) => {
   const result = await cli([
     ...sessionFeedbackArgs,
@@ -1250,4 +1261,28 @@ it('normalizes and sends valid provider and capability feedback', async () => {
   expect(requests[0].body.capabilityFeedback[0].requestedFunctionality).toBe(
     'Download attachments'
   );
+});
+
+it('sends missing_capability feedback without requestedFunctionality', async () => {
+  response = {
+    success: true,
+    feedbackId: 'feedback-missing-capability',
+    creditsRefunded: 0,
+  };
+  const capability = [
+    {
+      name: 'attachments',
+      provider: 'example',
+      issue: 'missing_capability',
+      why: 'Provider has no attachment endpoint',
+    },
+  ];
+  const result = await cli([
+    ...sessionFeedbackArgs,
+    '--capability-feedback',
+    JSON.stringify(capability),
+  ]);
+  expect(result.code).toBe(0);
+  expect(requests).toHaveLength(1);
+  expect(requests[0].body.capabilityFeedback).toEqual(capability);
 });
